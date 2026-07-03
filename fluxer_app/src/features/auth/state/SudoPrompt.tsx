@@ -11,6 +11,7 @@ import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import {makeSyncedField} from '@app/features/user/state/SyncedField';
 import Users from '@app/features/user/state/Users';
+import {isSsoManagedUser} from '@app/features/user/utils/AccountSecurityCapabilities';
 import {UserAuthenticatorTypes} from '@fluxer/constants/src/UserConstants';
 import {MfaMethod, SudoPromptStateSchema} from '@fluxer/schema/src/gen/fluxer/user/preferences/v1/preferences_pb';
 import {makeAutoObservable, runInAction} from 'mobx';
@@ -57,6 +58,7 @@ export interface AvailableMethods {
 	password: boolean;
 	totp: boolean;
 	webauthn: boolean;
+	sso: boolean;
 	hasMfa: boolean;
 }
 
@@ -75,12 +77,14 @@ const EMPTY_METHODS: AvailableMethods = {
 	password: false,
 	totp: false,
 	webauthn: false,
+	sso: false,
 	hasMfa: false,
 };
 
 function deriveMethodsFromCurrentUser(): AvailableMethods {
 	const user = Users.currentUser;
 	if (!user) return {...EMPTY_METHODS};
+	if (isSsoManagedUser(user)) return {...EMPTY_METHODS, sso: true};
 	const types = user.authenticatorTypes;
 	const totp = types?.includes(UserAuthenticatorTypes.TOTP) ?? false;
 	const webauthn = types?.includes(UserAuthenticatorTypes.WEBAUTHN) ?? false;
@@ -89,6 +93,7 @@ function deriveMethodsFromCurrentUser(): AvailableMethods {
 		password: !hasMfa,
 		totp,
 		webauthn,
+		sso: false,
 		hasMfa,
 	};
 }
@@ -183,6 +188,10 @@ class SudoPrompt {
 		if (!payload) return;
 		const baseline = deriveMethodsFromCurrentUser();
 		const hasMfa = typeof payload.has_mfa === 'boolean' ? payload.has_mfa : baseline.hasMfa;
+		if (baseline.sso) {
+			this.availableMethods = {...EMPTY_METHODS, sso: true};
+			return;
+		}
 		const methods = payload.methods ?? {};
 		const totp = methods.totp === true || (methods.totp === undefined && baseline.totp);
 		const webauthn = methods.webauthn === true || (methods.webauthn === undefined && baseline.webauthn);
@@ -190,6 +199,7 @@ class SudoPrompt {
 			password: !hasMfa,
 			totp,
 			webauthn,
+			sso: false,
 			hasMfa,
 		};
 	}
@@ -231,6 +241,11 @@ class SudoPrompt {
 			this.rejecter = null;
 			resolver(payload);
 		}
+	}
+
+	completeWithSsoToken(token: string): void {
+		Sudo.setToken(token);
+		this.submit({});
 	}
 
 	reject(reason?: unknown): void {

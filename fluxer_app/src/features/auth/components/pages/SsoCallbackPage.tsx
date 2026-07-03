@@ -8,6 +8,12 @@ import {
 	getPendingSsoRedirectTo,
 	startSsoLogin,
 } from '@app/features/auth/state/AuthFlow';
+import {
+	clearPendingSsoSudoState,
+	completeSsoSudo,
+	getPendingSsoSudoState,
+	SSO_SUDO_COMPLETE_MESSAGE,
+} from '@app/features/auth/state/SsoSudoFlow';
 import {safeRedirectTarget} from '@app/features/auth/utils/SafeRedirect';
 import {BACK_TO_SIGN_IN_DESCRIPTOR, TRY_AGAIN_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import * as RouterUtils from '@app/features/navigation/utils/RouterUtils';
@@ -75,6 +81,23 @@ const SsoCallbackPage = observer(function SsoCallbackPage() {
 				return;
 			}
 			try {
+				const pendingSudo = getPendingSsoSudoState(state);
+				if (pendingSudo) {
+					const result = await completeSsoSudo({code, state});
+					if (controller.signal.aborted) return;
+					window.opener?.postMessage(
+						{type: SSO_SUDO_COMPLETE_MESSAGE, state, sudoToken: result.sudoToken},
+						window.location.origin,
+					);
+					if (window.opener && !window.opener.closed) {
+						window.close();
+						return;
+					}
+					const redirectTo = safeRedirectTarget(pendingSudo.redirectTo) ?? '/';
+					clearPendingSsoSudoState(state);
+					RouterUtils.replaceWith(redirectTo);
+					return;
+				}
 				const result = await completeSsoLogin({code, state});
 				if (controller.signal.aborted) return;
 				await AuthenticationCommands.completeLogin(result);

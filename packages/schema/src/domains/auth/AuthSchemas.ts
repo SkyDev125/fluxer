@@ -149,6 +149,12 @@ export const SsoCompleteResponse = z.object({
 
 export type SsoCompleteResponse = z.infer<typeof SsoCompleteResponse>;
 
+export const SsoSudoCompleteResponse = z.object({
+	sudo_token: z.string().describe('Short-lived sudo token issued after SSO reauthentication'),
+});
+
+export type SsoSudoCompleteResponse = z.infer<typeof SsoSudoCompleteResponse>;
+
 export const AuthTokenWithUserIdResponse = z.object({
 	token: z.string().describe('Authentication token for API requests'),
 	user_id: SnowflakeStringType.describe('ID of the authenticated user'),

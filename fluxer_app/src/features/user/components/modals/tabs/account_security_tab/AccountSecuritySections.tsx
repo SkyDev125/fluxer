@@ -13,6 +13,7 @@ import {LinkedDevicesManagementModal} from '@app/features/user/components/modals
 import type {AccountSettingsManagementSectionId} from '@app/features/user/components/settings_utils/SettingsNavigationGroups';
 import type {User} from '@app/features/user/models/User';
 import type {WebAuthnCredential} from '@app/features/user/state/WebAuthnCredentials';
+import {getAccountSecurityCapabilities} from '@app/features/user/utils/AccountSecurityCapabilities';
 import * as FormUtils from '@app/lib/forms';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
@@ -53,6 +54,8 @@ interface AccountSecuritySectionsProps {
 export const AccountSecuritySections: React.FC<AccountSecuritySectionsProps> = observer(
 	({user, isClaimed, passkeys, showMaskedEmail, setShowMaskedEmail, targetSection}) => {
 		const {i18n} = useLingui();
+		const capabilities = getAccountSecurityCapabilities(user);
+		const showSignInDetails = isClaimed && (capabilities.canManageLocalEmail || capabilities.canManageLocalPassword);
 		const [authorizedAppsSubmitting, setAuthorizedAppsSubmitting] = useState(false);
 		const authorizedAppsSubmittingRef = useRef(false);
 		const openAuthorizedAppsModal = useCallback(() => {
@@ -85,7 +88,7 @@ export const AccountSecuritySections: React.FC<AccountSecuritySectionsProps> = o
 		};
 		return (
 			<>
-				{isClaimed && (
+				{showSignInDetails && (
 					<SettingsSection
 						id="account"
 						title={i18n._(SIGN_IN_DETAILS_DESCRIPTOR)}
@@ -109,6 +112,7 @@ export const AccountSecuritySections: React.FC<AccountSecuritySectionsProps> = o
 					>
 						<SecurityTabContent
 							user={user}
+							capabilities={capabilities}
 							isClaimed={isClaimed}
 							passkeys={passkeys}
 							authorizedAppsSubmitting={authorizedAppsSubmitting}

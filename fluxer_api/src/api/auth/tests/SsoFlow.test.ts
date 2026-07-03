@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {AuthSessionResponse} from '@fluxer/schema/src/domains/auth/AuthSchemas';
 import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, it} from 'vitest';
 import type {ApiTestHarness} from '../../test/ApiTestHarness';
 import {createBuilder, createBuilderWithoutAuth} from '../../test/TestRequestBuilder';
@@ -678,6 +679,96 @@ describe('Auth SSO flow', () => {
 					state: startData.state,
 				})
 				.expect(400)
+				.execute();
+		});
+	});
+	describe('sudo verification', () => {
+		let admin: TestAccount;
+		beforeEach(async () => {
+			admin = await createTestAccount(harness);
+			admin = await setUserACLs(harness, admin, [
+				'admin:authenticate',
+				'instance:config:update',
+				'instance:config:view',
+			]);
+			await enableSso(harness, admin.token);
+		});
+		afterEach(async () => {
+			await disableSso(harness, admin.token);
+		});
+		it('issues a sudo token after the current SSO user reauthenticates with SSO', async () => {
+			const email = createUniqueEmail('sso-sudo');
+			const subject = `itest-sso-sudo-${Date.now()}`;
+			const loginStart = await createBuilderWithoutAuth<SsoStartResponse>(harness)
+				.post('/auth/sso/start')
+				.body({})
+				.execute();
+			const login = await createBuilderWithoutAuth<SsoCompleteResponse>(harness)
+				.post('/auth/sso/complete')
+				.body({
+					code: JSON.stringify({email, sub: subject, email_verified: true}),
+					state: loginStart.state,
+				})
+				.execute();
+			const sessions = await createBuilder<Array<AuthSessionResponse>>(harness, login.token)
+				.get('/auth/sessions')
+				.execute();
+			expect(sessions.length).toBeGreaterThan(0);
+			await createBuilder(harness, login.token)
+				.post('/auth/sessions/logout')
+				.body({session_id_hashes: [sessions[0]!.id_hash]})
+				.expect(403)
+				.execute();
+			const sudoStart = await createBuilder<SsoStartResponse>(harness, login.token)
+				.post('/auth/sso/sudo/start')
+				.body({})
+				.execute();
+			const {response, json} = await createBuilder<{sudo_token: string}>(harness, login.token)
+				.post('/auth/sso/sudo/complete')
+				.body({
+					code: JSON.stringify({email, sub: subject, email_verified: true}),
+					state: sudoStart.state,
+				})
+				.executeWithResponse();
+			const sudoToken = response.headers.get('X-Fluxer-Sudo-Mode-JWT');
+			expect(sudoToken).toBeTruthy();
+			expect(json.sudo_token).toBe(sudoToken);
+			await createBuilder(harness, login.token)
+				.post('/auth/sessions/logout')
+				.header('X-Fluxer-Sudo-Mode-JWT', sudoToken!)
+				.body({session_id_hashes: [sessions[0]!.id_hash]})
+				.expect(204)
+				.execute();
+		});
+		it('rejects SSO sudo completion when the provider identity belongs to another user', async () => {
+			const email = createUniqueEmail('sso-sudo-owner');
+			const subject = `itest-sso-sudo-owner-${Date.now()}`;
+			const loginStart = await createBuilderWithoutAuth<SsoStartResponse>(harness)
+				.post('/auth/sso/start')
+				.body({})
+				.execute();
+			const login = await createBuilderWithoutAuth<SsoCompleteResponse>(harness)
+				.post('/auth/sso/complete')
+				.body({
+					code: JSON.stringify({email, sub: subject, email_verified: true}),
+					state: loginStart.state,
+				})
+				.execute();
+			const sudoStart = await createBuilder<SsoStartResponse>(harness, login.token)
+				.post('/auth/sso/sudo/start')
+				.body({})
+				.execute();
+			await createBuilder(harness, login.token)
+				.post('/auth/sso/sudo/complete')
+				.body({
+					code: JSON.stringify({
+						email: createUniqueEmail('sso-sudo-other'),
+						sub: `itest-sso-sudo-other-${Date.now()}`,
+						email_verified: true,
+					}),
+					state: sudoStart.state,
+				})
+				.expect(400, 'INVALID_FORM_BODY')
 				.execute();
 		});
 	});
