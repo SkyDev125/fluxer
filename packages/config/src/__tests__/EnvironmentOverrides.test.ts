@@ -89,6 +89,7 @@ describe('buildNamedFluxerEnvOverrides', () => {
 			FLUXER_S3_FORCE_PATH_STYLE: 'true',
 			FLUXER_AUTH_BLUESKY_KEYS: '[{"kid":"key-1","private_key_path":"/etc/fluxer/keys/bluesky.pem"}]',
 			FLUXER_ADMIN_BASE_PATH: '',
+			FLUXER_SSO_AUTO_REDIRECT: 'true',
 			FLUXER_STRIPE_PRICE_MONTHLY_USD: 'price_monthly_usd',
 		});
 
@@ -99,6 +100,7 @@ describe('buildNamedFluxerEnvOverrides', () => {
 				passkeys: {additional_allowed_origins: ['https://a.example', 'https://b.example']},
 				bluesky: {keys: [{kid: 'key-1', private_key_path: '/etc/fluxer/keys/bluesky.pem'}]},
 			},
+			instance: {sso: {auto_redirect: true}},
 			s3: {force_path_style: true},
 			services: {
 				admin: {base_path: ''},

@@ -320,6 +320,7 @@ const NAMED_FLUXER_ENV_OVERRIDES: Record<string, NamedEnvOverride> = {
 	FLUXER_COOKIE_SECURE: {path: ['cookie', 'secure'], parse: parseEnvValue},
 	FLUXER_SELF_HOSTED: {path: ['instance', 'self_hosted'], parse: parseEnvValue},
 	FLUXER_AUTO_JOIN_INVITE_CODE: {path: ['instance', 'auto_join_invite_code']},
+	FLUXER_SSO_AUTO_REDIRECT: {path: ['instance', 'sso', 'auto_redirect'], parse: parseEnvValue},
 	FLUXER_VISIONARIES_GUILD_ID: {path: ['instance', 'visionaries_guild_id']},
 	FLUXER_VISIONARIES_GUILD_VISIONARY_ROLE_ID: {path: ['instance', 'visionaries_guild_visionary_role_id']},
 	FLUXER_APP_PRODUCT_NAME: {path: ['instance', 'branding', 'product_name']},
