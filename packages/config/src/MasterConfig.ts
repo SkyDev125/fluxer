@@ -314,6 +314,9 @@ export interface MasterConfig {
 	};
 	instance: {
 		self_hosted: boolean;
+		sso: {
+			auto_redirect: boolean;
+		};
 		auto_join_invite_code?: string;
 		visionaries_guild_id?: string;
 		visionaries_guild_visionary_role_id?: string;

@@ -29,6 +29,7 @@ import {
 	type LoginSuccessPayload,
 	startSsoLogin,
 } from '@app/features/auth/state/AuthFlow';
+import {isLocalLoginBypassRequested, shouldAutoStartSso} from '@app/features/auth/utils/AutoSsoRedirect';
 import {NEED_ACCOUNT_DESCRIPTOR, SIGN_IN_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import * as RouterUtils from '@app/features/navigation/utils/RouterUtils';
 import {useLocation} from '@app/features/platform/components/router/RouterReact';
@@ -42,7 +43,7 @@ import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
 import clsx from 'clsx';
 import {observer} from 'mobx-react-lite';
-import {cloneElement, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react';
+import {cloneElement, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 const SESSION_EXPIRED_SIGN_IN_AGAIN_DESCRIPTOR = msg({
 	message: 'Session expired for {identifier}. Sign in again.',
@@ -118,6 +119,8 @@ export const AuthLoginLayout = observer(function AuthLoginLayout({
 	const accounts = AccountManager.orderedAccounts;
 	const hasStoredAccounts = accounts.length > 0;
 	const ssoConfig = RuntimeConfig.sso;
+	const autoSsoAttemptedRef = useRef(false);
+	const localLoginBypassRequested = isLocalLoginBypassRequested(`${location.pathname}${location.search}`);
 	const isSsoEnforced = Boolean(ssoConfig?.enabled && ssoConfig.enforced);
 	const ssoDisplayName = ssoConfig?.display_name ?? 'Single Sign-On';
 	const [isStartingSso, setIsStartingSso] = useState(false);
@@ -238,6 +241,21 @@ export const AuthLoginLayout = observer(function AuthLoginLayout({
 			setIsStartingSso(false);
 		}
 	}, [ssoConfig?.enabled, ssoRedirectPath, i18n]);
+	useEffect(() => {
+		if (
+			!shouldAutoStartSso({
+				sso: ssoConfig,
+				localLoginBypassRequested,
+				desktopHandoff,
+				isStartingSso,
+				hasAttemptedAutoSso: autoSsoAttemptedRef.current,
+			})
+		) {
+			return;
+		}
+		autoSsoAttemptedRef.current = true;
+		void handleStartSso();
+	}, [desktopHandoff, handleStartSso, isStartingSso, localLoginBypassRequested, ssoConfig]);
 	const styledRegisterLink = useMemo(() => {
 		const {className: linkClassName} = registerLink.props as {className?: string};
 		return cloneElement(registerLink, {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, it} from 'vitest';
+import {Config} from '../../Config';
 import type {ApiTestHarness} from '../../test/ApiTestHarness';
 import {createBuilder, createBuilderWithoutAuth} from '../../test/TestRequestBuilder';
 import {
@@ -28,6 +29,7 @@ interface SsoCompleteResponse {
 interface SsoStatusResponse {
 	enabled: boolean;
 	enforced: boolean;
+	auto_redirect: boolean;
 	display_name?: string;
 	redirect_uri: string;
 }
@@ -695,12 +697,14 @@ describe('Auth SSO flow', () => {
 			const status1 = await createBuilderWithoutAuth<SsoStatusResponse>(harness).get('/auth/sso/status').execute();
 			expect(status1.enabled).toBe(false);
 			expect(status1.enforced).toBe(false);
+			expect(status1.auto_redirect).toBe(false);
 			await enableSso(harness, admin.token, {
 				display_name: 'Test SSO Provider',
 			});
 			const status2 = await createBuilderWithoutAuth<SsoStatusResponse>(harness).get('/auth/sso/status').execute();
 			expect(status2.enabled).toBe(true);
 			expect(status2.enforced).toBe(true);
+			expect(status2.auto_redirect).toBe(false);
 			expect(status2.display_name).toBe('Test SSO Provider');
 			await disableSso(harness, admin.token);
 		});
@@ -711,7 +715,21 @@ describe('Auth SSO flow', () => {
 			const status = await createBuilderWithoutAuth<SsoStatusResponse>(harness).get('/auth/sso/status').execute();
 			expect(status.enabled).toBe(true);
 			expect(status.enforced).toBe(false);
+			expect(status.auto_redirect).toBe(false);
 			await disableSso(harness, admin.token);
+		});
+		it('reports automatic SSO redirect when runtime config enables it', async () => {
+			const previousAutoRedirect = Config.instance.sso.autoRedirect;
+			Config.instance.sso.autoRedirect = true;
+			try {
+				await enableSso(harness, admin.token);
+				const status = await createBuilderWithoutAuth<SsoStatusResponse>(harness).get('/auth/sso/status').execute();
+				expect(status.enabled).toBe(true);
+				expect(status.auto_redirect).toBe(true);
+			} finally {
+				Config.instance.sso.autoRedirect = previousAutoRedirect;
+				await disableSso(harness, admin.token);
+			}
 		});
 		it('does not advertise enabled SSO when optional SSO cannot resolve claims', async () => {
 			await createBuilder(harness, admin.token)
@@ -736,6 +754,7 @@ describe('Auth SSO flow', () => {
 			const status = await createBuilderWithoutAuth<SsoStatusResponse>(harness).get('/auth/sso/status').execute();
 			expect(status.enabled).toBe(false);
 			expect(status.enforced).toBe(false);
+			expect(status.auto_redirect).toBe(false);
 			await disableSso(harness, admin.token);
 		});
 	});

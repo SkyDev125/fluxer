@@ -279,6 +279,9 @@ export interface APIConfig {
 	};
 	instance: {
 		selfHosted: boolean;
+		sso: {
+			autoRedirect: boolean;
+		};
 		autoJoinInviteCode?: string;
 		visionariesGuildId?: string;
 		visionariesGuildVisionaryRoleId?: string;

@@ -253,6 +253,9 @@ function defaultConfig(): MasterConfig {
 		},
 		instance: {
 			self_hosted: false,
+			sso: {
+				auto_redirect: false,
+			},
 			branding: {
 				product_name: 'Fluxer',
 			},
